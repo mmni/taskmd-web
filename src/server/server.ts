@@ -19,7 +19,7 @@ function stripFrontmatter(raw: string): string {
   return raw;
 }
 import { fileURLToPath } from "node:url";
-import { listTasks, setTask, type Task, type SetFields } from "./taskmd.js";
+import { listTasks, setTask, archiveAll, type Task, type SetFields, type ArchiveScope } from "./taskmd.js";
 import { TaskWatcher } from "./watcher.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -87,6 +87,21 @@ export async function startServer(opts: ServerOptions): Promise<{ url: string }>
       }
       const raw = await readFile(abs, "utf8");
       return c.json({ body: stripFrontmatter(raw), file_path: task.file_path });
+    } catch (err) {
+      return c.json({ error: String(err) }, 500);
+    }
+  });
+
+  app.post("/api/archive", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { scope?: ArchiveScope };
+    if (body.scope !== "completed" && body.scope !== "cancelled") {
+      return c.json({ error: "scope must be 'completed' or 'cancelled'" }, 400);
+    }
+    try {
+      const before = (await getTasks()).filter((t) => t.status === body.scope).length;
+      await archiveAll(scanDir, body.scope);
+      cache.tasks = null;
+      return c.json({ archived: before });
     } catch (err) {
       return c.json({ error: String(err) }, 500);
     }

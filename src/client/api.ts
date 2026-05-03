@@ -27,6 +27,20 @@ export async function fetchTaskContent(id: string): Promise<{ body: string; file
   return (await res.json()) as { body: string; file_path: string };
 }
 
+export async function archiveAll(scope: "completed" | "cancelled"): Promise<number> {
+  const res = await fetch("/api/archive", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`POST /api/archive failed: ${res.status} ${text}`);
+  }
+  const body = (await res.json()) as { archived: number };
+  return body.archived;
+}
+
 export function subscribeTaskChanges(onChange: () => void): () => void {
   const source = new EventSource("/api/events");
   source.addEventListener("tasks-changed", onChange);

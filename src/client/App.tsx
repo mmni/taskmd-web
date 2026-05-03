@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Task, TagState } from "./types.js";
-import { fetchTasks, patchTask, subscribeTaskChanges } from "./api.js";
+import { archiveAll, fetchTasks, patchTask, subscribeTaskChanges } from "./api.js";
 import { GroupTabs } from "./components/GroupTabs.js";
 import { TagFilterBar } from "./components/TagFilterBar.js";
 import { TaskList } from "./components/TaskList.js";
@@ -21,6 +21,7 @@ export function App() {
   const [tagState, setTagState] = useState<Record<string, TagState>>({});
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState<"completed" | "cancelled" | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -137,12 +138,51 @@ export function App() {
       await reload();
     });
 
+  const completedCount = useMemo(
+    () => (tasks ?? []).filter((t) => t.status === "completed").length,
+    [tasks]
+  );
+  const cancelledCount = useMemo(
+    () => (tasks ?? []).filter((t) => t.status === "cancelled").length,
+    [tasks]
+  );
+
+  const onArchive = async (scope: "completed" | "cancelled", count: number) => {
+    if (count === 0 || archiving) return;
+    if (!window.confirm(`Archive ${count} ${scope} task${count === 1 ? "" : "s"}?`)) return;
+    setArchiving(scope);
+    try {
+      await archiveAll(scope);
+      await reload();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setArchiving(null);
+    }
+  };
+
   return (
     <div className="app">
       <header className="app-header">
         <h1>taskmd-web</h1>
         <div className="header-meta">
           {tasks && <span>{filteredTasks.length} of {tasks.length} tasks</span>}
+          <button
+            className="archive-btn"
+            onClick={() => onArchive("completed", completedCount)}
+            disabled={completedCount === 0 || archiving !== null}
+            title="taskmd archive --all-completed -y"
+          >
+            {archiving === "completed" ? "archiving…" : `archive completed (${completedCount})`}
+          </button>
+          <button
+            className="archive-btn"
+            onClick={() => onArchive("cancelled", cancelledCount)}
+            disabled={cancelledCount === 0 || archiving !== null}
+            title="taskmd archive --all-cancelled -y"
+          >
+            {archiving === "cancelled" ? "archiving…" : `archive cancelled (${cancelledCount})`}
+          </button>
           <button
             className="theme-toggle"
             onClick={toggleTheme}

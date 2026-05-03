@@ -67,3 +67,10 @@ export async function setTask(scanDir: string, id: string, fields: SetFields): P
   args.push("-d", scanDir);
   await runTaskmd(args, scanDir);
 }
+
+export type ArchiveScope = "completed" | "cancelled";
+
+export async function archiveAll(scanDir: string, scope: ArchiveScope): Promise<void> {
+  const flag = scope === "completed" ? "--all-completed" : "--all-cancelled";
+  await runTaskmd(["archive", flag, "-y", "-d", scanDir], scanDir);
+}

@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-05-03
+
+### Added
+
+- **Bulk archive buttons.** Two header buttons archive all `completed` /
+  `cancelled` tasks in one click, shelling out to `taskmd archive
+  --all-completed -y` and `taskmd archive --all-cancelled -y`. Each button
+  shows a live count and is disabled when zero. Confirms before running.
+- **`POST /api/archive`** endpoint accepting `{ scope: "completed" |
+  "cancelled" }`. Invalidates the task cache on success.
+
 ## [0.1.0] — 2026-05-02
 
 Initial public release.
@@ -60,4 +71,5 @@ Initial public release.
 - No archive view — archived tasks are filtered out.
 - No persistence of UI filter state across reloads.
 
+[0.2.0]: https://github.com/mmni/taskmd-web/releases/tag/v0.2.0
 [0.1.0]: https://github.com/mmni/taskmd-web/releases/tag/v0.1.0
