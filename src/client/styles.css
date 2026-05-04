@@ -571,6 +571,14 @@ body {
 
 .status-chip:hover { filter: brightness(0.97); }
 
+button.priority-chip {
+  cursor: pointer;
+  text-transform: lowercase;
+}
+
+button.priority-chip:hover:not(:disabled) { filter: brightness(0.97); }
+button.priority-chip:disabled { cursor: default; }
+
 .status-pending     { background: var(--status-pending-bg);     color: var(--status-pending-text);     border-color: var(--status-pending-ring); }
 .status-in-progress { background: var(--status-in-progress-bg); color: var(--status-in-progress-text); border-color: var(--status-in-progress-ring); }
 .status-in-review   { background: var(--status-in-review-bg);   color: var(--status-in-review-text);   border-color: var(--status-in-review-ring); }

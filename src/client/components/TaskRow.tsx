@@ -1,11 +1,12 @@
 import { useState } from "react";
 import type { Task } from "../types.js";
-import { STATUS_CYCLE } from "../types.js";
+import { STATUS_CYCLE, PRIORITY_CYCLE } from "../types.js";
 
 interface Props {
   task: Task;
   knownTags: string[];
   onStatusChange: (next: string) => void;
+  onPriorityChange: (next: string) => void;
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onTitleClick: () => void;
@@ -18,7 +19,13 @@ function nextStatus(current: string): string {
   return STATUS_CYCLE[(i + 1) % STATUS_CYCLE.length];
 }
 
-export function TaskRow({ task, knownTags, onStatusChange, onAddTag, onRemoveTag, onTitleClick, busy }: Props) {
+function nextPriority(current: string): string {
+  const i = PRIORITY_CYCLE.indexOf(current as (typeof PRIORITY_CYCLE)[number]);
+  if (i < 0) return PRIORITY_CYCLE[0];
+  return PRIORITY_CYCLE[(i + 1) % PRIORITY_CYCLE.length];
+}
+
+export function TaskRow({ task, knownTags, onStatusChange, onPriorityChange, onAddTag, onRemoveTag, onTitleClick, busy }: Props) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -52,7 +59,14 @@ export function TaskRow({ task, knownTags, onStatusChange, onAddTag, onRemoveTag
           {task.status}
         </button>
         {task.priority && (
-          <span className={`priority-chip priority-${task.priority}`}>{task.priority}</span>
+          <button
+            className={`priority-chip priority-${task.priority}`}
+            onClick={() => onPriorityChange(nextPriority(task.priority))}
+            title="click to cycle priority"
+            disabled={busy}
+          >
+            {task.priority}
+          </button>
         )}
       </div>
       <div className="task-row-content">

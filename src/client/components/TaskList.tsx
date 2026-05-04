@@ -6,12 +6,13 @@ interface Props {
   knownTags: string[];
   busyIds: Set<string>;
   onStatusChange: (id: string, next: string) => void;
+  onPriorityChange: (id: string, next: string) => void;
   onAddTag: (id: string, tag: string) => void;
   onRemoveTag: (id: string, tag: string) => void;
   onTitleClick: (id: string) => void;
 }
 
-export function TaskList({ tasks, knownTags, busyIds, onStatusChange, onAddTag, onRemoveTag, onTitleClick }: Props) {
+export function TaskList({ tasks, knownTags, busyIds, onStatusChange, onPriorityChange, onAddTag, onRemoveTag, onTitleClick }: Props) {
   if (tasks.length === 0) {
     return <div className="empty">No tasks match the current filters.</div>;
   }
@@ -24,6 +25,7 @@ export function TaskList({ tasks, knownTags, busyIds, onStatusChange, onAddTag, 
           knownTags={knownTags}
           busy={busyIds.has(task.id)}
           onStatusChange={(next) => onStatusChange(task.id, next)}
+          onPriorityChange={(next) => onPriorityChange(task.id, next)}
           onAddTag={(tag) => onAddTag(task.id, tag)}
           onRemoveTag={(tag) => onRemoveTag(task.id, tag)}
           onTitleClick={() => onTitleClick(task.id)}

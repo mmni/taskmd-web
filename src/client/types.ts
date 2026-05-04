@@ -33,3 +33,5 @@ export const STATUS_CYCLE = [
   "completed",
   "cancelled",
 ] as const;
+
+export const PRIORITY_CYCLE = ["low", "medium", "high", "critical"] as const;

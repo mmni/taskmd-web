@@ -1,6 +1,6 @@
 {
   "name": "taskmd-web",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Local web UI for taskmd repos (overlay; shells out to upstream taskmd CLI)",
   "license": "MIT",
   "type": "module",

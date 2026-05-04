@@ -126,6 +126,12 @@ export function App() {
       await reload();
     });
 
+  const onPriorityChange = (id: string, next: string) =>
+    withBusy(id, async () => {
+      await patchTask(id, { priority: next });
+      await reload();
+    });
+
   const onAddTag = (id: string, tag: string) =>
     withBusy(id, async () => {
       await patchTask(id, { addTags: [tag] });
@@ -232,6 +238,7 @@ export function App() {
             knownTags={knownTags}
             busyIds={busyIds}
             onStatusChange={onStatusChange}
+            onPriorityChange={onPriorityChange}
             onAddTag={onAddTag}
             onRemoveTag={onRemoveTag}
             onTitleClick={setOpenTaskId}
