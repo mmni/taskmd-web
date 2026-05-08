@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Task, TagState } from "./types.js";
+import { PLANNING_PREFIX, PLANNING_NONE, getPlanningValue } from "./types.js";
 import { archiveAll, fetchTasks, patchTask, subscribeTaskChanges } from "./api.js";
 import { GroupTabs } from "./components/GroupTabs.js";
 import { TagFilterBar } from "./components/TagFilterBar.js";
+import { PlanningFilterBar } from "./components/PlanningFilterBar.js";
 import { TaskList } from "./components/TaskList.js";
 import { TaskDetail } from "./components/TaskDetail.js";
 import { useTheme } from "./useTheme.js";
@@ -19,6 +21,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [tagState, setTagState] = useState<Record<string, TagState>>({});
+  const [planningState, setPlanningState] = useState<Record<string, TagState>>({});
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<"completed" | "cancelled" | null>(null);
@@ -66,11 +69,31 @@ export function App() {
   const tagsInScope = useMemo(() => {
     const counts = new Map<string, number>();
     for (const t of groupFiltered) {
-      for (const tag of t.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      for (const tag of t.tags) {
+        if (tag.startsWith(PLANNING_PREFIX)) continue;
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
     }
     return Array.from(counts.entries())
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+  }, [groupFiltered]);
+
+  const planningValuesInScope = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of groupFiltered) {
+      const v = getPlanningValue(t.tags);
+      if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+  }, [groupFiltered]);
+
+  const planningNoneCount = useMemo(() => {
+    let n = 0;
+    for (const t of groupFiltered) if (!getPlanningValue(t.tags)) n++;
+    return n;
   }, [groupFiltered]);
 
   const knownTags = useMemo(() => {
@@ -86,12 +109,22 @@ export function App() {
     const excludes = Object.entries(tagState)
       .filter(([, s]) => s === "exclude")
       .map(([t]) => t);
+    const planningIncludes = Object.entries(planningState)
+      .filter(([, s]) => s === "include")
+      .map(([v]) => v);
+    const planningExcludes = Object.entries(planningState)
+      .filter(([, s]) => s === "exclude")
+      .map(([v]) => v);
     return groupFiltered.filter((task) => {
       for (const inc of includes) if (!task.tags.includes(inc)) return false;
       for (const exc of excludes) if (task.tags.includes(exc)) return false;
+      const pv = getPlanningValue(task.tags);
+      const pvKey = pv ?? PLANNING_NONE;
+      if (planningIncludes.length > 0 && !planningIncludes.includes(pvKey)) return false;
+      if (planningExcludes.includes(pvKey)) return false;
       return true;
     });
-  }, [groupFiltered, tagState]);
+  }, [groupFiltered, tagState, planningState]);
 
   const cycleTag = (tag: string) => {
     setTagState((prev) => {
@@ -104,6 +137,18 @@ export function App() {
   };
 
   const clearTagFilter = () => setTagState({});
+
+  const cyclePlanning = (value: string) => {
+    setPlanningState((prev) => {
+      const next = { ...prev };
+      const newState = nextTagState(next[value] ?? "neutral");
+      if (newState === "neutral") delete next[value];
+      else next[value] = newState;
+      return next;
+    });
+  };
+
+  const clearPlanningFilter = () => setPlanningState({});
 
   const withBusy = async (id: string, fn: () => Promise<void>) => {
     setBusyIds((s) => new Set(s).add(id));
@@ -143,6 +188,29 @@ export function App() {
       await patchTask(id, { removeTags: [tag] });
       await reload();
     });
+
+  const onSetPlanning = (id: string, value: string | null) =>
+    withBusy(id, async () => {
+      const task = (tasks ?? []).find((t) => t.id === id);
+      if (!task) return;
+      const current = getPlanningValue(task.tags);
+      if (current === value) return;
+      const removeTags = current ? [`${PLANNING_PREFIX}${current}`] : undefined;
+      const addTags = value ? [`${PLANNING_PREFIX}${value}`] : undefined;
+      if (!removeTags && !addTags) return;
+      await patchTask(id, { ...(addTags && { addTags }), ...(removeTags && { removeTags }) });
+      await reload();
+    });
+
+  const planningOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tasks ?? []) {
+      for (const tag of t.tags) {
+        if (tag.startsWith(PLANNING_PREFIX)) set.add(tag.slice(PLANNING_PREFIX.length));
+      }
+    }
+    return Array.from(set).sort();
+  }, [tasks]);
 
   const completedCount = useMemo(
     () => (tasks ?? []).filter((t) => t.status === "completed").length,
@@ -227,6 +295,13 @@ export function App() {
             total={tasks.length}
             onSelect={setSelectedGroup}
           />
+          <PlanningFilterBar
+            values={planningValuesInScope}
+            noneCount={planningNoneCount}
+            state={planningState}
+            onCycle={cyclePlanning}
+            onClear={clearPlanningFilter}
+          />
           <TagFilterBar
             tags={tagsInScope}
             state={tagState}
@@ -236,11 +311,13 @@ export function App() {
           <TaskList
             tasks={filteredTasks}
             knownTags={knownTags}
+            planningOptions={planningOptions}
             busyIds={busyIds}
             onStatusChange={onStatusChange}
             onPriorityChange={onPriorityChange}
             onAddTag={onAddTag}
             onRemoveTag={onRemoveTag}
+            onSetPlanning={onSetPlanning}
             onTitleClick={setOpenTaskId}
           />
         </>

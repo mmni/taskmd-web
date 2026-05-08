@@ -35,3 +35,15 @@ export const STATUS_CYCLE = [
 ] as const;
 
 export const PRIORITY_CYCLE = ["low", "medium", "high", "critical"] as const;
+
+export const PLANNING_PREFIX = "planning:";
+export const PLANNING_NONE = "__none__";
+
+export function getPlanningValue(tags: string[]): string | null {
+  const found = tags.find((t) => t.startsWith(PLANNING_PREFIX));
+  return found ? found.slice(PLANNING_PREFIX.length) : null;
+}
+
+export function isPlanningTag(tag: string): boolean {
+  return tag.startsWith(PLANNING_PREFIX);
+}

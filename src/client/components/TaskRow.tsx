@@ -1,14 +1,16 @@
 import { useState } from "react";
 import type { Task } from "../types.js";
-import { STATUS_CYCLE, PRIORITY_CYCLE } from "../types.js";
+import { STATUS_CYCLE, PRIORITY_CYCLE, getPlanningValue, isPlanningTag } from "../types.js";
 
 interface Props {
   task: Task;
   knownTags: string[];
+  planningOptions: string[];
   onStatusChange: (next: string) => void;
   onPriorityChange: (next: string) => void;
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
+  onSetPlanning: (value: string | null) => void;
   onTitleClick: () => void;
   busy: boolean;
 }
@@ -25,17 +27,26 @@ function nextPriority(current: string): string {
   return PRIORITY_CYCLE[(i + 1) % PRIORITY_CYCLE.length];
 }
 
-export function TaskRow({ task, knownTags, onStatusChange, onPriorityChange, onAddTag, onRemoveTag, onTitleClick, busy }: Props) {
+export function TaskRow({ task, knownTags, planningOptions, onStatusChange, onPriorityChange, onAddTag, onRemoveTag, onSetPlanning, onTitleClick, busy }: Props) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
 
+  const planningValue = getPlanningValue(task.tags);
+  const displayTags = task.tags.filter((t) => !isPlanningTag(t));
+
   const suggestions = draft
-    ? knownTags.filter((t) => t.startsWith(draft) && !task.tags.includes(t)).slice(0, 6)
+    ? knownTags
+        .filter((t) => !isPlanningTag(t) && t.startsWith(draft) && !task.tags.includes(t))
+        .slice(0, 6)
     : [];
 
   const submitTag = (raw: string) => {
     const tag = raw.trim();
-    if (!tag) return;
+    if (!tag || isPlanningTag(tag)) {
+      setDraft("");
+      setAdding(false);
+      return;
+    }
     if (task.tags.includes(tag)) {
       setDraft("");
       setAdding(false);
@@ -69,6 +80,23 @@ export function TaskRow({ task, knownTags, onStatusChange, onPriorityChange, onA
           </button>
         )}
       </div>
+      <div className="task-planning-col">
+        <select
+          className={`planning-select ${planningValue ? "has-value" : "empty"}`}
+          value={planningValue ?? ""}
+          onChange={(e) => onSetPlanning(e.target.value ? e.target.value : null)}
+          disabled={busy}
+          title="planning bucket (use taskmd CLI to add new values)"
+        >
+          <option value="">—</option>
+          {planningValue && !planningOptions.includes(planningValue) && (
+            <option value={planningValue}>{planningValue}</option>
+          )}
+          {planningOptions.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      </div>
       <div className="task-row-content">
       <div className="task-row-title-line">
         <button
@@ -80,7 +108,7 @@ export function TaskRow({ task, knownTags, onStatusChange, onPriorityChange, onA
         </button>
       </div>
       <div className="task-row-tags">
-        {task.tags.map((tag) => (
+        {displayTags.map((tag) => (
           <span key={tag} className="tag-chip row">
             {tag}
             <button
