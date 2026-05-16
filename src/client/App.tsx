@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Task, TagState } from "./types.js";
-import { PLANNING_PREFIX, PLANNING_NONE, getPlanningValue } from "./types.js";
+import { PLANNING_PREFIX, PLANNING_NONE, STATUS_CYCLE, getPlanningValue } from "./types.js";
 import { archiveAll, fetchTasks, patchTask, subscribeTaskChanges } from "./api.js";
 import { GroupTabs } from "./components/GroupTabs.js";
 import { TagFilterBar } from "./components/TagFilterBar.js";
 import { PlanningFilterBar } from "./components/PlanningFilterBar.js";
+import { StatusFilterBar } from "./components/StatusFilterBar.js";
 import { TaskList } from "./components/TaskList.js";
 import { TaskDetail } from "./components/TaskDetail.js";
 import { useTheme } from "./useTheme.js";
@@ -22,6 +23,7 @@ export function App() {
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [tagState, setTagState] = useState<Record<string, TagState>>({});
   const [planningState, setPlanningState] = useState<Record<string, TagState>>({});
+  const [statusState, setStatusState] = useState<Record<string, TagState>>({});
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<"completed" | "cancelled" | null>(null);
@@ -96,6 +98,23 @@ export function App() {
     return n;
   }, [groupFiltered]);
 
+  const statusValuesInScope = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of groupFiltered) {
+      if (!t.status) continue;
+      counts.set(t.status, (counts.get(t.status) ?? 0) + 1);
+    }
+    const order = new Map<string, number>(STATUS_CYCLE.map((s, i) => [s, i]));
+    return Array.from(counts.entries())
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => {
+        const ai = order.get(a.value) ?? STATUS_CYCLE.length;
+        const bi = order.get(b.value) ?? STATUS_CYCLE.length;
+        if (ai !== bi) return ai - bi;
+        return a.value.localeCompare(b.value);
+      });
+  }, [groupFiltered]);
+
   const knownTags = useMemo(() => {
     const set = new Set<string>();
     for (const t of tasks ?? []) for (const tag of t.tags) set.add(tag);
@@ -115,6 +134,12 @@ export function App() {
     const planningExcludes = Object.entries(planningState)
       .filter(([, s]) => s === "exclude")
       .map(([v]) => v);
+    const statusIncludes = Object.entries(statusState)
+      .filter(([, s]) => s === "include")
+      .map(([v]) => v);
+    const statusExcludes = Object.entries(statusState)
+      .filter(([, s]) => s === "exclude")
+      .map(([v]) => v);
     return groupFiltered.filter((task) => {
       for (const inc of includes) if (!task.tags.includes(inc)) return false;
       for (const exc of excludes) if (task.tags.includes(exc)) return false;
@@ -122,9 +147,11 @@ export function App() {
       const pvKey = pv ?? PLANNING_NONE;
       if (planningIncludes.length > 0 && !planningIncludes.includes(pvKey)) return false;
       if (planningExcludes.includes(pvKey)) return false;
+      if (statusIncludes.length > 0 && !statusIncludes.includes(task.status)) return false;
+      if (statusExcludes.includes(task.status)) return false;
       return true;
     });
-  }, [groupFiltered, tagState, planningState]);
+  }, [groupFiltered, tagState, planningState, statusState]);
 
   const cycleTag = (tag: string) => {
     setTagState((prev) => {
@@ -149,6 +176,18 @@ export function App() {
   };
 
   const clearPlanningFilter = () => setPlanningState({});
+
+  const cycleStatus = (value: string) => {
+    setStatusState((prev) => {
+      const next = { ...prev };
+      const newState = nextTagState(next[value] ?? "neutral");
+      if (newState === "neutral") delete next[value];
+      else next[value] = newState;
+      return next;
+    });
+  };
+
+  const clearStatusFilter = () => setStatusState({});
 
   const withBusy = async (id: string, fn: () => Promise<void>) => {
     setBusyIds((s) => new Set(s).add(id));
@@ -301,6 +340,12 @@ export function App() {
             state={planningState}
             onCycle={cyclePlanning}
             onClear={clearPlanningFilter}
+          />
+          <StatusFilterBar
+            values={statusValuesInScope}
+            state={statusState}
+            onCycle={cycleStatus}
+            onClear={clearStatusFilter}
           />
           <TagFilterBar
             tags={tagsInScope}
